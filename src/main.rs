@@ -1,10 +1,18 @@
+use clap::Parser;
 use orfail::OrFail;
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+
+#[derive(Parser)]
+#[clap(version)]
+struct Args {
+    /// Name of the command to run.
+    #[clap(default_value = "default")]
+    name: String,
+}
 
 fn main() -> orfail::Result<()> {
-    let path = find_dot_uribo_file_path().or_fail()?;
-    let command = std::fs::read_to_string(path).or_fail()?;
-
+    let args = Args::parse();
+    let command = find_command(&args).or_fail()?;
     let status = std::process::Command::new("sh")
         .arg("-c")
         .arg(command)
@@ -15,18 +23,20 @@ fn main() -> orfail::Result<()> {
     std::process::exit(code);
 }
 
-fn find_dot_uribo_file_path() -> orfail::Result<PathBuf> {
+fn find_command(args: &Args) -> orfail::Result<String> {
     let mut dir = std::env::current_dir().or_fail()?;
     loop {
         let path = dir.join(".uribo");
         if path.exists() {
-            return Ok(path);
+            let file = std::fs::File::open(&path).or_fail()?;
+            let mut command_map: BTreeMap<String, String> = serde_json::from_reader(file)
+                .or_fail_with(|e| format!("failed to parse {}: {e}", path.display()))?;
+            if let Some(command) = command_map.remove(&args.name) {
+                return Ok(command);
+            }
         }
-        if !dir.pop() {
-            break;
-        }
+        dir.pop().or_fail_with(|_| {
+            format!(".uribo file defining {:?} command is not found", args.name)
+        })?;
     }
-    Err(orfail::Failure::new(
-        ".uribo file is not found in any directory between the current and the root.",
-    ))
 }
