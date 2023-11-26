@@ -198,7 +198,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "orfail",
- "serde",
  "serde_json",
 ]
 
