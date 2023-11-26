@@ -22,7 +22,8 @@ $ cat .uribo
 $ uribo run hello
 Hello World!
 
-// If the specified command is not found in the $PWD/.uribo file, the parent directories will be searched.
+// If the specified command is not found in the $PWD/.uribo file,
+// the parent directories will be searched.
 $ echo '{"ver": "uribo --version"}' > ../.uribo
 $ uribo run ver
 uribo 0.1.0
