@@ -72,7 +72,7 @@ fn delete(name: &str) -> orfail::Result<()> {
     }
 
     let file = std::fs::File::open(&path).or_fail()?;
-    let mut command_map: BTreeMap<String, String> = serde_json::from_reader(file)
+    let mut command_map: BTreeMap<String, Command> = serde_json::from_reader(file)
         .or_fail_with(|e| format!("failed to parse {}: {e}", path.display()))?;
     if command_map.remove(name).is_none() {
         eprintln!("{name:?} command is not defined");
