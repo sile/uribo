@@ -16,7 +16,12 @@ $ uribo run hello
 $ uribo put hello -- echo "Hello World!"
 $ cat .uribo
 {
-  "hello": "echo Hello World!"
+  "hello": {
+    "command": "echo",
+    "args": [
+      "Hello World!"
+    ]
+  }
 }
 
 $ uribo run hello
@@ -24,7 +29,7 @@ Hello World!
 
 // If the specified command is not found in the $PWD/.uribo file,
 // the parent directories will be searched.
-$ echo '{"ver": "uribo --version"}' > ../.uribo
+$ echo '{"ver": {"command": "uribo", "args": ["--version"]}}' > ../.uribo
 $ uribo run ver
-uribo 0.1.0
+uribo 0.2.0
 ```
