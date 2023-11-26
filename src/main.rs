@@ -11,7 +11,7 @@ enum Args {
         name: String,
 
         /// Shell to run the command.
-        #[clap(long, default_value = "sh", env = "URIBO_SHELL")]
+        #[clap(long, default_value = "sh", env = "SHELL")]
         shell: String,
     },
 
