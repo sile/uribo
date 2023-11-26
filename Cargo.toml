@@ -1,6 +1,12 @@
 [package]
 name = "uribo"
 version = "0.1.0"
+authors = ["Takeru Ohta <phjgt308@gmail.com>"]
+description = "A command-line tool for executing predefined commands"
+homepage = "https://github.com/sile/uribo"
+repository = "https://github.com/sile/uribo"
+readme = "README.md"
+license = "MIT"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
