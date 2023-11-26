@@ -1,29 +1,22 @@
+use orfail::OrFail;
 use std::path::PathBuf;
 
-fn main() {
-    let Ok(path) = find_dot_uribo_file_path().map_err(|e| eprintln!("{e}")) else {
-        std::process::exit(1);
-    };
+fn main() -> orfail::Result<()> {
+    let path = find_dot_uribo_file_path().or_fail()?;
+    let command = std::fs::read_to_string(path).or_fail()?;
 
-    let Ok(command) = std::fs::read_to_string(path).map_err(|e| eprintln!("{e}")) else {
-        std::process::exit(1);
-    };
-
-    let Ok(status) = std::process::Command::new("sh")
+    let status = std::process::Command::new("sh")
         .arg("-c")
         .arg(command)
         .status()
-        .map_err(|e| eprintln!("{e}"))
-    else {
-        std::process::exit(1);
-    };
-    if let Some(code) = status.code() {
-        std::process::exit(code);
-    }
+        .or_fail()?;
+
+    let code = status.code().unwrap_or(0);
+    std::process::exit(code);
 }
 
-fn find_dot_uribo_file_path() -> Result<PathBuf, String> {
-    let mut dir = std::env::current_dir().map_err(|e| e.to_string())?;
+fn find_dot_uribo_file_path() -> orfail::Result<PathBuf> {
+    let mut dir = std::env::current_dir().or_fail()?;
     loop {
         let path = dir.join(".uribo");
         if path.exists() {
@@ -33,5 +26,7 @@ fn find_dot_uribo_file_path() -> Result<PathBuf, String> {
             break;
         }
     }
-    Err(".uribo file is not found in any directory between the current and the root.".to_owned())
+    Err(orfail::Failure::new(
+        ".uribo file is not found in any directory between the current and the root.",
+    ))
 }
