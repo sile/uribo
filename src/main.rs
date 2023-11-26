@@ -9,10 +9,6 @@ enum Args {
     Run {
         /// Name of the command to run.
         name: String,
-
-        /// Shell to run the command.
-        #[clap(long, default_value = "sh", env = "SHELL")]
-        shell: String,
     },
 
     /// Put a command definition to `$PWD/.uribo` file
@@ -37,7 +33,7 @@ enum Args {
 fn main() -> orfail::Result<()> {
     let args = Args::parse();
     match args {
-        Args::Run { name, shell } => run(&name, &shell).or_fail(),
+        Args::Run { name } => run(&name).or_fail(),
         Args::Put {
             name,
             command,
@@ -93,12 +89,12 @@ fn delete(name: &str) -> orfail::Result<()> {
     Ok(())
 }
 
-fn run(name: &str, shell: &str) -> orfail::Result<()> {
+fn run(name: &str) -> orfail::Result<()> {
     let Some(command) = find_command(name).or_fail()? else {
         eprintln!("{name:?} command is not defined");
         std::process::exit(1);
     };
-    let status = std::process::Command::new(shell)
+    let status = std::process::Command::new("sh")
         .arg("-c")
         .arg(command)
         .status()
