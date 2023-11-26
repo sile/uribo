@@ -8,7 +8,6 @@ enum Args {
     /// Run a command defined in a .uribo file between the current directory and the root directory
     Run {
         /// Name of the command to run.
-        #[clap(default_value = "default")]
         name: String,
 
         /// Shell to run the command.
