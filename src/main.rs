@@ -16,11 +16,8 @@ enum Args {
         /// Command name.
         name: String,
 
-        /// Command to run.
-        command: String,
-
-        /// Arguments to pass to the command.
-        args: Vec<String>,
+        #[clap(flatten)]
+        command: Command,
     },
 
     /// Delete a command definition from `$PWD/.uribo` file
@@ -30,20 +27,25 @@ enum Args {
     },
 }
 
+#[derive(Clone, clap::Args, serde::Serialize, serde::Deserialize)]
+struct Command {
+    /// Command to run.
+    command: String,
+
+    /// Arguments to pass to the command.
+    args: Vec<String>,
+}
+
 fn main() -> orfail::Result<()> {
     let args = Args::parse();
     match args {
         Args::Run { name } => run(&name).or_fail(),
-        Args::Put {
-            name,
-            command,
-            args,
-        } => put(&name, &command, &args).or_fail(),
+        Args::Put { name, command } => put(&name, command).or_fail(),
         Args::Delete { name } => delete(&name).or_fail(),
     }
 }
 
-fn put(name: &str, command: &str, args: &[String]) -> orfail::Result<()> {
+fn put(name: &str, command: Command) -> orfail::Result<()> {
     let path = std::env::current_dir().or_fail()?.join(".uribo");
     let mut command_map = if path.exists() {
         let file = std::fs::File::open(&path).or_fail()?;
@@ -53,11 +55,6 @@ fn put(name: &str, command: &str, args: &[String]) -> orfail::Result<()> {
         BTreeMap::new()
     };
 
-    let command = if args.is_empty() {
-        command.to_owned()
-    } else {
-        format!("{} {}", command, args.join(" "))
-    };
     command_map.insert(name.to_owned(), command);
 
     let mut json = serde_json::to_string_pretty(&command_map).or_fail()?;
@@ -94,9 +91,8 @@ fn run(name: &str) -> orfail::Result<()> {
         eprintln!("{name:?} command is not defined");
         std::process::exit(1);
     };
-    let status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(command)
+    let status = std::process::Command::new(&command.command)
+        .args(&command.args)
         .status()
         .or_fail()?;
 
@@ -104,13 +100,13 @@ fn run(name: &str) -> orfail::Result<()> {
     std::process::exit(code);
 }
 
-fn find_command(name: &str) -> orfail::Result<Option<String>> {
+fn find_command(name: &str) -> orfail::Result<Option<Command>> {
     let mut dir = std::env::current_dir().or_fail()?;
     loop {
         let path = dir.join(".uribo");
         if path.exists() {
             let file = std::fs::File::open(&path).or_fail()?;
-            let mut command_map: BTreeMap<String, String> = serde_json::from_reader(file)
+            let mut command_map: BTreeMap<String, Command> = serde_json::from_reader(file)
                 .or_fail_with(|e| format!("failed to parse {}: {e}", path.display()))?;
             if let Some(command) = command_map.remove(name) {
                 return Ok(Some(command));
