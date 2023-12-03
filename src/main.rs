@@ -1,6 +1,6 @@
 use clap::Parser;
 use orfail::OrFail;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 #[derive(Parser)]
 #[clap(version)]
@@ -34,6 +34,13 @@ struct Command {
 
     /// Arguments to pass to the command.
     args: Vec<String>,
+
+    /// Working directory to run the command.
+    ///
+    /// Relative paths are resolved against the directory containing the .uribo file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[clap(long, short)]
+    working_dir: Option<PathBuf>,
 }
 
 fn main() -> orfail::Result<()> {
@@ -87,20 +94,21 @@ fn delete(name: &str) -> orfail::Result<()> {
 }
 
 fn run(name: &str) -> orfail::Result<()> {
-    let Some(command) = find_command(name).or_fail()? else {
+    let Some((command, uribo_dir)) = find_command(name).or_fail()? else {
         eprintln!("{name:?} command is not defined");
         std::process::exit(1);
     };
-    let status = std::process::Command::new(&command.command)
-        .args(&command.args)
-        .status()
-        .or_fail()?;
+    let mut cmd = std::process::Command::new(&command.command);
+    if let Some(dir) = command.working_dir {
+        cmd.current_dir(uribo_dir.join(dir));
+    }
+    let status = cmd.args(&command.args).status().or_fail()?;
 
     let code = status.code().unwrap_or(0);
     std::process::exit(code);
 }
 
-fn find_command(name: &str) -> orfail::Result<Option<Command>> {
+fn find_command(name: &str) -> orfail::Result<Option<(Command, PathBuf)>> {
     let mut dir = std::env::current_dir().or_fail()?;
     loop {
         let path = dir.join(".uribo");
@@ -109,7 +117,7 @@ fn find_command(name: &str) -> orfail::Result<Option<Command>> {
             let mut command_map: BTreeMap<String, Command> = serde_json::from_reader(file)
                 .or_fail_with(|e| format!("failed to parse {}: {e}", path.display()))?;
             if let Some(command) = command_map.remove(name) {
-                return Ok(Some(command));
+                return Ok(Some((command, dir)));
             }
         }
         if !dir.pop() {
