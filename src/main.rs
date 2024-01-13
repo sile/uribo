@@ -9,6 +9,9 @@ enum Args {
     Run {
         /// Name of the command to run.
         name: String,
+
+        /// Extra arguments to pass to the command.
+        extra_args: Vec<String>,
     },
 
     /// Put a command definition to `$PWD/.uribo` file
@@ -46,7 +49,10 @@ struct Command {
 fn main() -> orfail::Result<()> {
     let args = Args::parse();
     match args {
-        Args::Run { name } => run(&name).or_fail(),
+        Args::Run {
+            name,
+            extra_args: args,
+        } => run(&name, args).or_fail(),
         Args::Put { name, command } => put(&name, command).or_fail(),
         Args::Delete { name } => delete(&name).or_fail(),
     }
@@ -93,8 +99,8 @@ fn delete(name: &str) -> orfail::Result<()> {
     Ok(())
 }
 
-fn run(name: &str) -> orfail::Result<()> {
-    let Some((command, uribo_dir)) = find_command(name).or_fail()? else {
+fn run(name: &str, extra_args: Vec<String>) -> orfail::Result<()> {
+    let Some((mut command, uribo_dir)) = find_command(name).or_fail()? else {
         eprintln!("{name:?} command is not defined");
         std::process::exit(1);
     };
@@ -102,6 +108,7 @@ fn run(name: &str) -> orfail::Result<()> {
     if let Some(dir) = command.working_dir {
         cmd.current_dir(uribo_dir.join(dir));
     }
+    command.args.extend(extra_args);
     let status = cmd.args(&command.args).status().or_fail()?;
 
     let code = status.code().unwrap_or(0);
