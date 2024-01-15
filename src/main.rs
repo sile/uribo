@@ -28,6 +28,9 @@ enum Args {
         /// Command name.
         name: String,
     },
+
+    #[command(external_subcommand)]
+    External(Vec<String>),
 }
 
 #[derive(Clone, clap::Args, serde::Serialize, serde::Deserialize)]
@@ -55,6 +58,11 @@ fn main() -> orfail::Result<()> {
         } => run(&name, args).or_fail(),
         Args::Put { name, command } => put(&name, command).or_fail(),
         Args::Delete { name } => delete(&name).or_fail(),
+        Args::External(mut args) => {
+            (!args.is_empty()).or_fail_with(|_| "No subcommand given".to_owned())?;
+            let name = args.remove(0);
+            run(&name, args).or_fail()
+        }
     }
 }
 
