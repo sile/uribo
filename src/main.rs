@@ -1,6 +1,11 @@
 use clap::Parser;
 use orfail::OrFail;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
+
+const ENV_DEFAULT_CONFIG_PATH: &str = "URIBO_DEFAULT_CONFIG_PATH";
 
 #[derive(Parser)]
 #[clap(version)]
@@ -128,15 +133,39 @@ fn find_command(name: &str) -> orfail::Result<Option<(Command, PathBuf)>> {
     loop {
         let path = dir.join(".uribo");
         if path.exists() {
-            let file = std::fs::File::open(&path).or_fail()?;
-            let mut command_map: BTreeMap<String, Command> = serde_json::from_reader(file)
-                .or_fail_with(|e| format!("failed to parse {}: {e}", path.display()))?;
-            if let Some(command) = command_map.remove(name) {
-                return Ok(Some((command, dir)));
+            let result = find_command_from_path(name, &path).or_fail()?;
+            if result.is_some() {
+                return Ok(result);
             }
         }
         if !dir.pop() {
             break;
+        }
+    }
+
+    if let Ok(path) = std::env::var(ENV_DEFAULT_CONFIG_PATH) {
+        let path: &Path = path.as_ref();
+        let result = find_command_from_path(name, &path).or_fail()?;
+        if result.is_some() {
+            return Ok(result);
+        }
+    }
+
+    Ok(None)
+}
+
+fn find_command_from_path<P: AsRef<Path>>(
+    command_name: &str,
+    path: P,
+) -> orfail::Result<Option<(Command, PathBuf)>> {
+    let path = path.as_ref();
+    if path.exists() {
+        let file = std::fs::File::open(&path).or_fail()?;
+        let mut command_map: BTreeMap<String, Command> = serde_json::from_reader(file)
+            .or_fail_with(|e| format!("failed to parse {}: {e}", path.display()))?;
+        if let Some(command) = command_map.remove(command_name) {
+            let dir = path.parent().or_fail()?.to_owned();
+            return Ok(Some((command, dir)));
         }
     }
     Ok(None)
