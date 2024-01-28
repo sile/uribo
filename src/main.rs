@@ -19,6 +19,12 @@ enum Args {
         extra_args: Vec<String>,
     },
 
+    /// Find a command defined in a .uribo file between the current directory and the root directory
+    Find {
+        /// Name of the command to find.
+        name: String,
+    },
+
     /// Put a command definition to `$PWD/.uribo` file
     Put {
         /// Command name.
@@ -61,6 +67,7 @@ fn main() -> orfail::Result<()> {
             name,
             extra_args: args,
         } => run(&name, args).or_fail(),
+        Args::Find { name } => find(&name).or_fail(),
         Args::Put { name, command } => put(&name, command).or_fail(),
         Args::Delete { name } => delete(&name).or_fail(),
         Args::External(mut args) => {
@@ -113,10 +120,12 @@ fn delete(name: &str) -> orfail::Result<()> {
 }
 
 fn run(name: &str, extra_args: Vec<String>) -> orfail::Result<()> {
-    let Some((mut command, uribo_dir)) = find_command(name).or_fail()? else {
+    let Some((mut command, config_path)) = find_command(name).or_fail()? else {
         eprintln!("{name:?} command is not defined");
         std::process::exit(1);
     };
+    let uribo_dir = config_path.parent().or_fail()?;
+
     let mut cmd = std::process::Command::new(&command.command);
     if let Some(dir) = command.working_dir {
         cmd.current_dir(uribo_dir.join(dir));
@@ -128,14 +137,34 @@ fn run(name: &str, extra_args: Vec<String>) -> orfail::Result<()> {
     std::process::exit(code);
 }
 
+fn find(name: &str) -> orfail::Result<()> {
+    let Some((command, config_path)) = find_command(name).or_fail()? else {
+        eprintln!("{name:?} command is not defined");
+        std::process::exit(1);
+    };
+
+    #[derive(serde::Serialize)]
+    struct Output {
+        command: Command,
+        config_path: PathBuf,
+    }
+
+    let output = Output {
+        command,
+        config_path,
+    };
+    serde_json::to_writer_pretty(std::io::stdout(), &output).or_fail()?;
+    println!();
+    Ok(())
+}
+
 fn find_command(name: &str) -> orfail::Result<Option<(Command, PathBuf)>> {
     let mut dir = std::env::current_dir().or_fail()?;
     loop {
         let path = dir.join(".uribo");
         if path.exists() {
-            let result = find_command_from_path(name, &path).or_fail()?;
-            if result.is_some() {
-                return Ok(result);
+            if let Some(command) = find_command_from_path(name, &path).or_fail()? {
+                return Ok(Some((command, path)));
             }
         }
         if !dir.pop() {
@@ -145,9 +174,8 @@ fn find_command(name: &str) -> orfail::Result<Option<(Command, PathBuf)>> {
 
     if let Ok(path) = std::env::var(ENV_DEFAULT_CONFIG_PATH) {
         let path: &Path = path.as_ref();
-        let result = find_command_from_path(name, &path).or_fail()?;
-        if result.is_some() {
-            return Ok(result);
+        if let Some(command) = find_command_from_path(name, &path).or_fail()? {
+            return Ok(Some((command, path.to_owned())));
         }
     }
 
@@ -157,15 +185,14 @@ fn find_command(name: &str) -> orfail::Result<Option<(Command, PathBuf)>> {
 fn find_command_from_path<P: AsRef<Path>>(
     command_name: &str,
     path: P,
-) -> orfail::Result<Option<(Command, PathBuf)>> {
+) -> orfail::Result<Option<Command>> {
     let path = path.as_ref();
     if path.exists() {
         let file = std::fs::File::open(&path).or_fail()?;
         let mut command_map: BTreeMap<String, Command> = serde_json::from_reader(file)
             .or_fail_with(|e| format!("failed to parse {}: {e}", path.display()))?;
         if let Some(command) = command_map.remove(command_name) {
-            let dir = path.parent().or_fail()?.to_owned();
-            return Ok(Some((command, dir)));
+            return Ok(Some(command));
         }
     }
     Ok(None)
