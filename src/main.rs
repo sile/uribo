@@ -174,7 +174,7 @@ fn find_command(name: &str) -> orfail::Result<Option<(Command, PathBuf)>> {
 
     if let Ok(path) = std::env::var(ENV_DEFAULT_CONFIG_PATH) {
         let path: &Path = path.as_ref();
-        if let Some(command) = find_command_from_path(name, &path).or_fail()? {
+        if let Some(command) = find_command_from_path(name, path).or_fail()? {
             return Ok(Some((command, path.to_owned())));
         }
     }
@@ -188,7 +188,7 @@ fn find_command_from_path<P: AsRef<Path>>(
 ) -> orfail::Result<Option<Command>> {
     let path = path.as_ref();
     if path.exists() {
-        let file = std::fs::File::open(&path).or_fail()?;
+        let file = std::fs::File::open(path).or_fail()?;
         let mut command_map: BTreeMap<String, Command> = serde_json::from_reader(file)
             .or_fail_with(|e| format!("failed to parse {}: {e}", path.display()))?;
         if let Some(command) = command_map.remove(command_name) {
