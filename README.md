@@ -33,3 +33,18 @@ $ echo '{"ver": {"command": "uribo", "args": ["--version"]}}' > ../.uribo
 $ uribo run ver
 uribo 0.2.0
 ```
+
+Recommended Fish shell configuration
+------------------------------------
+
+```fish
+set -x URIBO_DEFAULT_CONFIG_PATH "$HOME/.uribo"
+
+function fish_command_not_found
+    if uribo find $argv[1] > /dev/null 2> /dev/null
+        uribo run $argv
+    else
+        __fish_default_command_not_found_handler $argv[1]
+    end
+end
+```
